@@ -41,3 +41,17 @@ const tc_tweaked = @import("what_you_named_it").tweakTranslateC(b, .{
     .tweaks_artifact = b.dependency("what_you_named_it", .{...}).artifact("tc_tweaks"),
 });
 ```
+
+## Usage
+The name you used in `addImport` can be imported from any file inside `project_module`, any functions or structs that start with the prefix you gave will now be accessible without that prefix.
+
+Only using `addTranslateC`:
+```zig
+@import("my_lib").SDL_doStuff();
+```
+Adding the tweaks step:
+```zig
+@import("my_lib").doStuff();
+```
+
+ZLS seems to play nice as well, at least on my machine
