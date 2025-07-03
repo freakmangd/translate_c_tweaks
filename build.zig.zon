@@ -1,0 +1,12 @@
+.{
+    .name = .translate_c_tweaks,
+    .version = "0.0.0",
+    .fingerprint = 0x12095f4b7efa02ce, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.15.0-dev.864+75d0ec9c0",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
