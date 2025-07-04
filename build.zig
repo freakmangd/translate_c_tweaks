@@ -8,7 +8,7 @@ pub fn build(b: *std.Build) void {
         .name = "tc_tweaks",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/translate_c_tweaks.zig"),
-            .target = target,
+            .target = b.graph.host,
             .optimize = optimize,
         }),
     });
