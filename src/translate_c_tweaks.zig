@@ -16,7 +16,6 @@ pub fn main() !void {
     };
     defer input_file.close();
     var input_buffered_reader = std.io.bufferedReader(input_file.reader());
-    _ = &input_buffered_reader;
 
     const output_file = output_file: {
         const output_file_path = args.next() orelse @panic("Missing argument 2: output file path");
