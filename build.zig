@@ -12,6 +12,10 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
+
+    const clap = b.dependency("clap", .{});
+    translate_c_tweaks.root_module.addImport("clap", clap.module("clap"));
+
     b.installArtifact(translate_c_tweaks);
 
     const mod_tests = b.addTest(.{ .root_module = translate_c_tweaks.root_module });
@@ -39,6 +43,8 @@ pub fn build(b: *std.Build) void {
         .tweaks_artifact = translate_c_tweaks,
         .translate_c_step = translate_c_example,
         .prefix_trim_string = "SDL_",
+        .auto_init_gen = true,
+        .camel_case_functions = true,
     });
     example.root_module.addImport("sdl", tweaked_c_mod);
     example.root_module.addCSourceFile(.{ .file = b.path("src/test.c") });
@@ -60,6 +66,8 @@ pub fn tweakTranslateC(b: *std.Build, options: struct {
     optimize: ?std.builtin.OptimizeMode = null,
     translate_c_step: *std.Build.Step.TranslateC,
     prefix_trim_string: []const u8,
+    auto_init_gen: bool = false,
+    camel_case_functions: bool = false,
 }) *std.Build.Module {
     const tweak_exe = tweak_exe: {
         if (options.tweaks_artifact) |tweak_exe| break :tweak_exe tweak_exe;
@@ -75,17 +83,27 @@ pub fn tweakTranslateC(b: *std.Build, options: struct {
     };
 
     const run_tc_tweaks = b.addRunArtifact(tweak_exe);
+    //run_tc_tweaks.has_side_effects = true;
 
-    run_tc_tweaks.addFileArg(options.translate_c_step.getOutput());
+    run_tc_tweaks.addPrefixedFileArg("-i", options.translate_c_step.getOutput());
 
     const tweaked_tc_mod = b.createModule(.{
-        .root_source_file = run_tc_tweaks.addOutputFileArg("translate_c_tweaked.zig"),
+        .root_source_file = run_tc_tweaks.addPrefixedOutputFileArg("-o", "translate_c_tweaked.zig"),
         .target = options.target,
         .optimize = options.optimize,
         .link_libc = true,
     });
 
+    run_tc_tweaks.addArg("-p");
     run_tc_tweaks.addArg(options.prefix_trim_string);
+
+    if (options.auto_init_gen) {
+        run_tc_tweaks.addArg("--auto-init-gen");
+    }
+
+    if (options.camel_case_functions) {
+        run_tc_tweaks.addArg("--camel-case");
+    }
 
     return tweaked_tc_mod;
 }
