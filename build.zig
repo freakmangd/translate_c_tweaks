@@ -41,7 +41,7 @@ pub fn build(b: *std.Build) void {
 
     const tweaked_c_mod = tweakTranslateC(b, .{
         .tweaks_artifact = translate_c_tweaks,
-        .translate_c_step = translate_c_example,
+        .translate_c_output = translate_c_example.getOutput(),
         .prefix_trim_string = "SDL_",
         .auto_init_gen = true,
         .camel_case_functions = true,
@@ -58,16 +58,28 @@ pub fn build(b: *std.Build) void {
     }
 }
 
+const GatherDeclsOption = enum {
+    none,
+    returns,
+    name_contains,
+    returns_and_name_contains,
+    returns_or_name_contains,
+};
+
 pub fn tweakTranslateC(b: *std.Build, options: struct {
     dependency_name: []const u8 = "translate_c_tweaks",
     /// override fetching the tweaks artifact from your dependencies
     tweaks_artifact: ?*std.Build.Step.Compile = null,
     target: ?std.Build.ResolvedTarget = null,
     optimize: ?std.builtin.OptimizeMode = null,
-    translate_c_step: *std.Build.Step.TranslateC,
+    translate_c_output: std.Build.LazyPath,
     prefix_trim_string: []const u8,
     auto_init_gen: bool = false,
     camel_case_functions: bool = false,
+    gather_decls: GatherDeclsOption = .none,
+    type_aliases: []const [2][]const u8 = &.{},
+    type_extra_decls: []const [2][]const u8 = &.{},
+    redefine_types: []const [2][]const u8 = &.{},
 }) *std.Build.Module {
     const tweak_exe = tweak_exe: {
         if (options.tweaks_artifact) |tweak_exe| break :tweak_exe tweak_exe;
@@ -85,7 +97,7 @@ pub fn tweakTranslateC(b: *std.Build, options: struct {
     const run_tc_tweaks = b.addRunArtifact(tweak_exe);
     //run_tc_tweaks.has_side_effects = true;
 
-    run_tc_tweaks.addPrefixedFileArg("-i", options.translate_c_step.getOutput());
+    run_tc_tweaks.addPrefixedFileArg("-i", options.translate_c_output);
 
     const tweaked_tc_mod = b.createModule(.{
         .root_source_file = run_tc_tweaks.addPrefixedOutputFileArg("-o", "translate_c_tweaked.zig"),
@@ -104,6 +116,40 @@ pub fn tweakTranslateC(b: *std.Build, options: struct {
     if (options.camel_case_functions) {
         run_tc_tweaks.addArg("--camel-case");
     }
+
+    for (options.type_aliases) |ta| {
+        run_tc_tweaks.addArg("--alias");
+        run_tc_tweaks.addArg(b.fmt("{s},{s}", .{ ta[0], ta[1] }));
+    }
+
+    if (options.type_extra_decls.len > 0 or options.redefine_types.len > 0) {
+        run_tc_tweaks.addArg("--extras");
+    }
+
+    var bytes: std.Io.Writer.Allocating = .init(b.allocator);
+    //defer bytes.deinit();
+
+    for (options.type_extra_decls) |extra| {
+        bytes.writer.print("{s} {}\n{s}\n", .{
+            extra[0],
+            std.mem.count(u8, extra[1], "\n") + 1,
+            extra[1],
+        }) catch @panic("OOM");
+    }
+
+    bytes.writer.writeAll("---\n") catch @panic("OOM");
+
+    for (options.redefine_types) |redef| {
+        bytes.writer.print("{s} {}\n{s}\n", .{
+            redef[0],
+            std.mem.count(u8, redef[1], "\n") + 1,
+            redef[1],
+        }) catch @panic("OOM");
+    }
+
+    //std.debug.print("THIS IS STDIN!!!: {s}\n\n\n", .{bytes.written()});
+
+    run_tc_tweaks.setStdIn(.{ .bytes = bytes.written() });
 
     return tweaked_tc_mod;
 }
